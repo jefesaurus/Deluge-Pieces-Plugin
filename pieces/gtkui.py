@@ -346,15 +346,33 @@ class PiecesTab(Tab):
         self._child_widget = glade_tab.get_widget("pieces_tab")
         self._tab_label = glade_tab.get_widget("pieces_tab_label")
 
+        # Main vertical box
+        vb = gtk.VBox()
+        # Inner horizontal box
+        hbox = gtk.HBox(False, 0)
+
+
+        # Sequential download checkbox
+        self.cb = gtk.CheckButton(label="Sequentially prioritize undownloaded pieces.")
+        self.cb.connect("toggled",self.onPrioTogg)
+        hbox.pack_start(self.cb,expand=False,fill=False,padding=5)
+
+        # Number of downloads spin selector
+        self.spin_label = gtk.Label("Number of sequential pieces to prioritize: ")
+        self.adj = gtk.Adjustment(10, 1, 99, 1, 10)
+        self.spinner = gtk.SpinButton(self.adj, 0, 0)
+        self.adj.connect("value_changed", self.onSpinnerValueChanged, self.spinner)
+        hbox.pack_start(self.spin_label,expand=False,fill=False,padding=5)
+        hbox.pack_start(self.spinner,expand=False,fill=False,padding=5)
+
+        vb.pack_start(hbox, True, True, 5)
+
+        # Pieces representation
         self._ms = MultiSquare(0,['#000000','#FF0000','#0000FF'],
                                display=self._child_widget.get_display(),
                                menu=glade_tab.get_widget("priority_menu"))
 
-        vb = gtk.VBox()
         vb.add(self._ms)
-        self.cb = gtk.CheckButton(label="Set priority of first un-downloaded piece to High")
-        self.cb.connect("toggled",self.onPrioTogg)
-        vb.pack_end(self.cb,expand=False,fill=False,padding=5)
 
         vp = gtk.Viewport()
         vp.set_shadow_type(gtk.SHADOW_NONE)
@@ -379,6 +397,12 @@ class PiecesTab(Tab):
                 client.pieces.add_priority_torrent(self._current)
             else:
                 client.pieces.del_priority_torrent(self._current)
+        else:
+            widget.set_active(False)
+
+    def onSpinnerValueChanged(self, widget, spinner):
+        if (self._current):
+            client.pieces.set_priority_download_num(self._current, spinner.get_value_as_int())
         else:
             widget.set_active(False)
 

@@ -61,10 +61,11 @@ class Core(CorePluginBase):
         self.dling_color = self.config['dling_color']
         self.priority_loop = None
         self.priority_torrents = {}
+        self.priority_download_nums = {}
         deferLater(reactor, 5, self.enable_priority_loop)
 
     def enable_priority_loop(self):
-        self.priority_loop = LoopingCall(priority_loop,self.get_priority_torrents)
+        self.priority_loop = LoopingCall(priority_loop, self.get_priority_torrents, self.get_priority_download_nums)
         self.priority_loop.start(2)
 
     def disable(self):
@@ -120,6 +121,11 @@ class Core(CorePluginBase):
             del self.priority_torrents[torr]
 
     @export
+    def set_priority_download_num(self, torr, download_num):
+        "set the number of pieces for a given torrent to prioritize"
+        self.priority_download_nums[torr] = download_num
+
+    @export
     def is_priority_torrent(self, torr):
         "return True if torrent is in list of torrents to prioritize first un-downloaded piece, else False"
         if self.priority_torrents.get(torr):
@@ -131,6 +137,11 @@ class Core(CorePluginBase):
     def get_priority_torrents(self):
         "get dict of torrents with first un-downloaded piece priority boosted"
         return self.priority_torrents
+
+    @export
+    def get_priority_download_nums(self):
+        "get dict of number of pieces to prioritize index by torrent"
+        return self.priority_download_nums
 
     @export
     def set_config(self, config):
