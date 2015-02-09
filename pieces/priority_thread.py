@@ -40,32 +40,44 @@ from deluge.ui.client import client
 import deluge.component as component
 
 __target_priority = 5
-__last_first = {}
+
+# Could also be a function of the number of seeders
+__high_pri_queue_size = 10
+__high_pri_queues = {}
 
 def priority_loop(meth):
     torrents = meth()
     for t in torrents:
         tor = component.get("TorrentManager").torrents[t]
         if tor.status.state == tor.status.downloading:
-            lf = __last_first.get(t)
-            if not(lf):
-                lf = 0
-            try:
-                cand = tor.status.pieces.index(False,lf)
-                if (tor.handle.piece_priority(cand) == 0):
-                    prios = tor.handle.piece_priorities()
-                    while (tor.handle.piece_priority(cand) == 0):
-                        cand += 1
-                        pcand = 0
-                        for (i,x) in enumerate(prios[cand:]):
-                            if x > 0:
-                                pcand = i + cand
-                                break
-                        cand = max(tor.status.pieces.index(False,cand), pcand)
-                lf = cand
-            except ValueError:
-                continue
-            # lf is now the first un-downloaded, desired piece of this torrent
-            if (tor.handle.piece_priority(lf) < __target_priority):
-                tor.handle.piece_priority(lf,__target_priority)
-            __last_first[t] = lf
+            piece_queue = __high_pri_queues.get(t)
+            if not(piece_queue):
+                piece_queue = []
+            # Filter out already downloaded pieces
+            piece_queue = [x for x in piece_queue if not tor.status.pieces[x]]
+            priorities = tor.handle.piece_priorities()
+
+            while len(piece_queue) < __high_pri_queue_size:
+                if len(piece_queue) == 0:
+                    next_possibility = 0
+                else:
+                    next_possibility = piece_queue[-1] + 1
+                try:
+                    next = tor.status.pieces.index(False, next_possibility)
+                    if (priorities[next] == 0):
+                        while (priorities[next] == 0):
+                            next += 1
+                            pcand = 0
+                            for (i,x) in enumerate(priorities[next:]):
+                                if x > 0:
+                                    pcand = i + next
+                                    break
+                            next = max(tor.status.pieces.index(False,next), pcand)
+                    piece_queue.append(next)
+                except ValueError:
+                    break
+            
+            for piece_index in piece_queue:
+                if (priorities[piece_index] < __target_priority):
+                  tor.handle.piece_priority(piece_index, __target_priority)
+            __high_pri_queues[t] = piece_queue
